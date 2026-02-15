@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>모바일 테트리스</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="hud">
+        <h1>테트리스</h1>
+        <div class="stats">
+          <p>점수: <span id="score">0</span></p>
+          <p>레벨: <span id="level">1</span></p>
+          <p>라인: <span id="lines">0</span></p>
+        </div>
+      </header>
+
+      <section class="preview-panel" aria-label="다음 블록 정보">
+        <h2>다음 블록</h2>
+        <canvas id="nextBoard" width="120" height="120" aria-label="다음 블록 미리보기"></canvas>
+      </section>
+
+      <section class="game-area" aria-label="테트리스 게임 영역">
+        <canvas id="board" width="300" height="600" aria-label="테트리스 보드"></canvas>
+      </section>
+
+      <section class="controls" aria-label="모바일 컨트롤">
+        <div class="control-row">
+          <button class="btn" id="leftBtn" aria-label="왼쪽">◀</button>
+          <button class="btn" id="rotateBtn" aria-label="회전">⟳</button>
+          <button class="btn" id="rightBtn" aria-label="오른쪽">▶</button>
+        </div>
+        <div class="control-row">
+          <button class="btn wide" id="downBtn" aria-label="내리기">▼ 내리기</button>
+          <button class="btn wide" id="dropBtn" aria-label="바로 떨어뜨리기">⤓ 하드드롭</button>
+        </div>
+        <div class="control-row">
+          <button class="btn wide" id="pauseBtn" aria-label="일시정지">⏸ 일시정지</button>
+          <button class="btn wide" id="restartBtn" aria-label="다시 시작">↺ 다시 시작</button>
+        </div>
+        <div class="control-row audio-row">
+          <button class="btn wide" id="musicBtn" aria-label="배경음 켜고 끄기">🎵 배경음 켜기</button>
+          <button class="btn wide" id="sfxBtn" aria-label="효과음 켜고 끄기">🔊 효과음 켜짐</button>
+        </div>
+      </section>
+
+      <p id="status" class="status" role="status" aria-live="polite">방향키/버튼으로 플레이하세요.</p>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
