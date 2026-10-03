@@ -15,3 +15,23 @@ test('paper LOC fills at close, not limit',()=>{const p0={qty:0,avg:0,cost:0,cas
 test('DST safe New York date',()=>{assert.equal(nyDate(new Date('2026-10-04T01:00:00Z')),'2026-10-03');assert.equal(nyDate(new Date('2026-12-04T04:30:00Z')),'2026-12-03');});
 test('CAS prevents simultaneous state updates',async()=>{const a=await read(),b=await read();await write(a.raw,a.state);await assert.rejects(write(b.raw,b.state),/충돌/);});
 test('signed cookie rejects tamper and cross-origin',()=>{process.env.SESSION_SECRET='test-only-secret-32-characters-long';const cookie=issue();assert.equal(authenticated({headers:{cookie:'ib_session='+cookie}}),true);assert.equal(authenticated({headers:{cookie:'ib_session='+cookie+'a'}}),false);assert.equal(sameOrigin({headers:{origin:'https://evil.example',host:'trade.example'}}),false);});
+import {windowFor,matchOrder,applyBroker} from '../lib/orders.mjs';
+test('market window handles holiday, early close, DST timestamp and cutoff',()=>{
+ const date='2026-11-27',cal={today:{date,regularMarket:{startTime:'2026-11-27T09:30:00-05:00',endTime:'2026-11-27T13:00:00-05:00'}}};
+ assert.equal(windowFor(cal,date,Date.parse('2026-11-27T17:00:00Z')).open,true);
+ assert.equal(windowFor(cal,date,Date.parse('2026-11-27T17:30:00Z')).open,false);
+ assert.equal(windowFor({today:{date,regularMarket:null}},date).open,false);
+ assert.equal(windowFor(cal,'2026-11-28').open,false);
+});
+test('recovery rejects wrong stock, old orders, quantity and price mismatches',()=>{
+ const p={symbol:'TQQQ',date:'2026-10-05',created:Date.parse('2026-10-05T15:00:00Z'),rows:[{id:'star',side:'BUY',qty:2,price:50,tif:'CLS'}]};
+ const b={symbol:'TQQQ',side:'BUY',quantity:'2',price:'50',timeInForce:'CLS',orderType:'LIMIT',currency:'USD',orderedAt:'2026-10-05T15:00:05Z'};
+ assert.equal(matchOrder(p,'star',b).id,'star');
+ for(const patch of [{symbol:'SOXL'},{quantity:'3'},{price:'49.99'},{orderedAt:'2026-10-04T15:00:05Z'}])assert.throws(()=>matchOrder(p,'star',{...b,...patch}));
+});
+test('cumulative fill polling cannot double-count or roll backward',()=>{
+ const p={rows:[{id:'a'}],execution:{a:{status:'ACCEPTED'}}};const broker={status:'PARTIAL_FILLED',execution:{filledQuantity:'2',averageFilledPrice:'50'}};
+ assert.equal(applyBroker(p,'a',broker),2);assert.equal(applyBroker(p,'a',broker),0);
+ assert.throws(()=>applyBroker(p,'a',{status:'PENDING',execution:{filledQuantity:'1'}}));
+ applyBroker(p,'a',{status:'FILLED',execution:{filledQuantity:'3',averageFilledPrice:'50'}});assert.equal(p.status,'COMPLETED');
+});
