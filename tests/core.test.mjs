@@ -1,0 +1,17 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {plan,simulate,nyDate,validatePosition} from '../lib/strategy.mjs';
+import {read,write} from '../lib/store.mjs';
+import {issue,authenticated,sameOrigin} from '../lib/auth.mjs';
+const c={seed:4000,feePct:0,maxOrder:10000};
+const p={qty:10,avg:50,cost:500,cash:3500};
+test('T rounding, half budget and non-overlapping LOC prices',()=>{const r=plan(c,p);assert.equal(r.t,5);assert.equal(r.starPct,7.5);assert.equal(r.phase,'EARLY');assert.equal(r.rows.find(x=>x.id==='avg').qty,1);assert.equal(r.rows.find(x=>x.id==='quarter').price,53.75);assert.equal(r.rows.find(x=>x.id==='target').qty,8);});
+test('late half switches to one LOC buy',()=>{const r=plan(c,{qty:40,avg:50,cost:2000,cash:2000});assert.equal(r.phase,'LATE');assert.equal(r.rows.filter(x=>x.side==='BUY').length,1);assert.equal(r.rows[0].price,49.99);});
+test('quarter boundary blocks EVERY order including unsupported MOC',()=>{assert.equal(plan(c,{qty:78,avg:50.01,cost:3900.78,cash:100}).phase,'QUARTER');assert.deepEqual(plan(c,{qty:79,avg:50,cost:3950,cash:50}).rows,[]);});
+test('first entry requires explicit limit',()=>{assert.equal(plan(c,{qty:0,avg:0,cost:0,cash:4000}).rows.length,0);assert.equal(plan(c,{qty:0,avg:0,cost:0,cash:4000},25).rows[0].qty,4);});
+test('budget includes fees and cannot consume other allocated capital',()=>{const r=plan({...c,feePct:.1},{qty:0,avg:0,cost:0,cash:4000},25);assert.equal(r.rows[0].qty,3);const full=plan(c,{qty:80,avg:50,cost:4000,cash:50000});assert.equal(full.rows.length,0);});
+test('reject corrupt cost, negative and nonfinite inputs',()=>{for(const pp of [{...p,cost:1},{...p,qty:1.5},{...p,cash:NaN},{...p,avg:-1}])assert.throws(()=>validatePosition(pp));});
+test('paper sells do not oversell when both sales fill',()=>{const r=plan(c,p);const result=simulate(c,p,r.rows,{high:60,close:56});assert.equal(result.position.qty,0);assert.equal(result.position.cost,0);assert.equal(result.fills.reduce((n,f)=>n+f.qty,0),10);});
+test('paper LOC fills at close, not limit',()=>{const p0={qty:0,avg:0,cost:0,cash:4000};const r=plan(c,p0,25);const out=simulate(c,p0,r.rows,{high:26,close:24});assert.equal(out.position.qty,4);assert.equal(out.position.avg,24);assert.equal(out.position.cash,3904);});
+test('DST safe New York date',()=>{assert.equal(nyDate(new Date('2026-10-04T01:00:00Z')),'2026-10-03');assert.equal(nyDate(new Date('2026-12-04T04:30:00Z')),'2026-12-03');});
+test('CAS prevents simultaneous state updates',async()=>{const a=await read(),b=await read();await write(a.raw,a.state);await assert.rejects(write(b.raw,b.state),/충돌/);});
+test('signed cookie rejects tamper and cross-origin',()=>{process.env.SESSION_SECRET='test-only-secret-32-characters-long';const cookie=issue();assert.equal(authenticated({headers:{cookie:'ib_session='+cookie}}),true);assert.equal(authenticated({headers:{cookie:'ib_session='+cookie+'a'}}),false);assert.equal(sameOrigin({headers:{origin:'https://evil.example',host:'trade.example'}}),false);});
